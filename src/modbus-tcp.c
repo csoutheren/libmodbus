@@ -806,6 +806,23 @@ static int
 _modbus_tcp_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_to_read)
 {
     int s_rc;
+#if defined(HAVE_POLL) 
+    struct pollfd pollinfo;
+    pollinfo.fd     = ctx->s;
+    pollinfo.events = POLLIN;
+    int msecs       = tv->tv_sec * 1000 + tv->tv_usec / 1000;
+    while ((s_rc = poll(&pollinfo, 1, msecs)) == -1) {
+        if (errno == EINTR) {
+            if (ctx->debug) {
+                fprintf(stderr, "A non blocked signal was caught\n");
+            }
+            pollinfo.fd     = ctx->s;
+            pollinfo.events = POLLIN;
+        } else {
+            return -1;
+        }
+    }
+#else   
     while ((s_rc = select(ctx->s + 1, rset, NULL, NULL, tv)) == -1) {
         if (errno == EINTR) {
             if (ctx->debug) {
@@ -818,6 +835,7 @@ _modbus_tcp_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_t
             return -1;
         }
     }
+#endif
 
     if (s_rc == 0) {
         errno = ETIMEDOUT;

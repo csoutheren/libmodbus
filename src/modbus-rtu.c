@@ -1179,7 +1179,6 @@ _modbus_rtu_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_t
         }
     }
 #endif // HAVE_POLL 
-
     if (s_rc == 0) {
         /* Timeout */
         errno = ETIMEDOUT;
