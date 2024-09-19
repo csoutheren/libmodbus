@@ -63,6 +63,10 @@
 #include "modbus-tcp-private.h"
 #include "modbus-tcp.h"
 
+#if defined(HAVE_POLL)
+#include <poll.h>
+#endif
+
 #ifdef OS_WIN32
 static int _modbus_tcp_init_win32(void)
 {
@@ -286,9 +290,15 @@ static int _connect(int sockfd,
 #else
     if (rc == -1 && errno == EINPROGRESS) {
 #endif
+
+#if defined(HAVE_POLL)
+        struct pollfd pollinfo;
+        pollinfo.fd     = sockfd;
+        pollinfo.events = POLLOUT;
+        int msecs       = ro_tv->tv_sec * 1000 + ro_tv->tv_usec / 1000;
+        rc = poll(&pollinfo, 1, msecs);
+#else
         fd_set wset;
-        int optval;
-        socklen_t optlen = sizeof(optval);
         struct timeval tv = *ro_tv;
 
         /* Wait to be available in writing */
@@ -299,12 +309,20 @@ static int _connect(int sockfd,
             /* Fail */
             return -1;
         }
+#endif        
+        if (rc < 0) {
+            /* Fail */
+            return -1;
+        }
 
         if (rc == 0) {
             /* Timeout */
             errno = ETIMEDOUT;
             return -1;
         }
+
+        int optval;
+        socklen_t optlen = sizeof(optval);
 
         /* The connection is established if SO_ERROR and optval are set to 0 */
         rc = getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void *) &optval, &optlen);

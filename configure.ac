@@ -147,6 +147,8 @@ AC_CHECK_DECLS([TIOCSRS485], [], [], [[#include <sys/ioctl.h>]])
 # Check for RTS flags
 AC_CHECK_DECLS([TIOCM_RTS], [], [], [[#include <sys/ioctl.h>]])
 
+AC_CHECK_FUNC([poll], [AC_DEFINE([HAVE_POLL], [1], [Define to 1 if you have the <poll.h> header file and poll exists])], [[#include <poll.h>]])
+
 # Wtype-limits is not supported by gcc 4.2 (default on recent Mac OS X)
 my_CFLAGS="-Wall \
 -Wmissing-declarations -Wmissing-prototypes \
