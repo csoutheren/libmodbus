@@ -26,6 +26,10 @@
 #include <linux/serial.h>
 #endif
 
+#if defined(HAVE_POLL)
+#include <poll.h>
+#endif
+
 /* Table of CRC values for high-order byte */
 static const uint8_t table_crc_hi[] = {
     0x00, 0xC1, 0x81, 0x40, 0x01, 0xC0, 0x80, 0x41, 0x01, 0xC0, 0x80, 0x41, 0x00, 0xC1,
@@ -1145,6 +1149,23 @@ _modbus_rtu_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_t
         return -1;
     }
 #else
+#if defined(HAVE_POLL)
+    struct pollfd pollinfo;
+    pollinfo.fd     = ctx->s;
+    pollinfo.events = POLLIN;
+    int msecs       = tv->tv_sec * 1000 + tv->tv_usec / 1000;
+    while ((s_rc = poll(&pollinfo, 1, msecs)) == -1) {
+        if (errno == EINTR) {
+            if (ctx->debug) {
+                fprintf(stderr, "A non blocked signal was caught\n");
+            }
+            pollinfo.fd     = ctx->s;
+            pollinfo.events = POLLIN;
+        } else {
+            return -1;
+        }
+    }
+#else
     while ((s_rc = select(ctx->s + 1, rset, NULL, NULL, tv)) == -1) {
         if (errno == EINTR) {
             if (ctx->debug) {
@@ -1157,13 +1178,13 @@ _modbus_rtu_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_t
             return -1;
         }
     }
-
+#endif // HAVE_POLL
+#endif // WIN32
     if (s_rc == 0) {
         /* Timeout */
         errno = ETIMEDOUT;
         return -1;
     }
-#endif
 
     return s_rc;
 }

@@ -61,6 +61,10 @@
 #include "modbus-tcp-private.h"
 #include "modbus-tcp.h"
 
+#if defined(HAVE_POLL)
+#include <poll.h>
+#endif
+
 #ifdef OS_WIN32
 static int _modbus_tcp_init_win32(void)
 {
@@ -284,19 +288,29 @@ static int _connect(int sockfd,
 #else
     if (rc == -1 && errno == EINPROGRESS) {
 #endif
-        fd_set wset;
-        int optval;
-        socklen_t optlen = sizeof(optval);
-        struct timeval tv = *ro_tv;
 
         /* Wait to be available in writing */
+#if defined(HAVE_POLL)
+        struct pollfd pollinfo;
+        pollinfo.fd     = sockfd;
+        pollinfo.events = POLLOUT;
+        int msecs       = ro_tv->tv_sec * 1000 + ro_tv->tv_usec / 1000;
+        rc = poll(&pollinfo, 1, msecs);
+#else
+        fd_set wset;
+        struct timeval tv = *ro_tv;
         FD_ZERO(&wset);
         FD_SET(sockfd, &wset);
         rc = select(sockfd + 1, NULL, &wset, NULL, &tv);
+#endif
+
         if (rc <= 0) {
             /* Timeout or fail */
             return -1;
         }
+
+        int optval;
+        socklen_t optlen = sizeof(optval);
 
         /* The connection is established if SO_ERROR and optval are set to 0 */
         rc = getsockopt(sockfd, SOL_SOCKET, SO_ERROR, (void *) &optval, &optlen);
@@ -762,6 +776,23 @@ static int
 _modbus_tcp_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_to_read)
 {
     int s_rc;
+#if defined(HAVE_POLL) 
+    struct pollfd pollinfo;
+    pollinfo.fd     = ctx->s;
+    pollinfo.events = POLLIN;
+    int msecs       = tv->tv_sec * 1000 + tv->tv_usec / 1000;
+    while ((s_rc = poll(&pollinfo, 1, msecs)) == -1) {
+        if (errno == EINTR) {
+            if (ctx->debug) {
+                fprintf(stderr, "A non blocked signal was caught\n");
+            }
+            pollinfo.fd     = ctx->s;
+            pollinfo.events = POLLIN;
+        } else {
+            return -1;
+        }
+    }
+#else   
     while ((s_rc = select(ctx->s + 1, rset, NULL, NULL, tv)) == -1) {
         if (errno == EINTR) {
             if (ctx->debug) {
@@ -774,6 +805,7 @@ _modbus_tcp_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_t
             return -1;
         }
     }
+#endif
 
     if (s_rc == 0) {
         errno = ETIMEDOUT;

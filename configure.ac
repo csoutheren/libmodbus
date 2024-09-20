@@ -146,6 +146,8 @@ my_CFLAGS="-Wall \
 -Wformat-security"
 AC_SUBST([my_CFLAGS])
 
+AC_CHECK_FUNC([poll], [AC_DEFINE([HAVE_POLL], [1], [Define to 1 if you have the <poll.h> header file and poll exists])], [[#include <poll.h>]])
+
 # Build options
 AC_ARG_ENABLE(tests,
 	AS_HELP_STRING([--disable-tests],
