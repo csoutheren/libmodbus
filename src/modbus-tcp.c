@@ -305,10 +305,6 @@ static int _connect(int sockfd,
         FD_ZERO(&wset);
         FD_SET(sockfd, &wset);
         rc = select(sockfd + 1, NULL, &wset, NULL, &tv);
-        if (rc < 0) {
-            /* Fail */
-            return -1;
-        }
 #endif        
         if (rc < 0) {
             /* Fail */
