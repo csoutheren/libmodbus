@@ -294,7 +294,7 @@ static int _connect(int sockfd,
         struct pollfd pollinfo;
         pollinfo.fd     = sockfd;
         pollinfo.events = POLLOUT;
-        int msecs       = ro_tv->tv_sec * 1000 + ro_tv->tv_usec / 1000;
+        int msecs       = (ro_tv == 0) ? -1 : ro_tv->tv_sec * 1000 + ro_tv->tv_usec / 1000;
         rc = poll(&pollinfo, 1, msecs);
 #else
         fd_set wset;
@@ -780,7 +780,7 @@ _modbus_tcp_select(modbus_t *ctx, fd_set *rset, struct timeval *tv, int length_t
     struct pollfd pollinfo;
     pollinfo.fd     = ctx->s;
     pollinfo.events = POLLIN;
-    int msecs       = tv->tv_sec * 1000 + tv->tv_usec / 1000;
+    int msecs       = (tv == 0) ? -1 : (tv->tv_sec * 1000 + tv->tv_usec / 1000);
     while ((s_rc = poll(&pollinfo, 1, msecs)) == -1) {
         if (errno == EINTR) {
             if (ctx->debug) {
